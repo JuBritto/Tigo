@@ -1,0 +1,117 @@
+// Definição dos pinos (Mantidos conforme seu original)
+#define Echo_A 22 
+#define Trig_A 24 
+#define Echo_B 47 
+#define Trig_B 48 
+#define Echo_C 28 
+#define Trig_C 25 
+
+#define PWMA 12    
+#define DIRA1 34 
+#define DIRA2 35   
+
+#define PWMB 8     
+#define DIRB1 37 
+#define DIRB2 36   
+
+#define PWMC 6     
+#define DIRC1 43 // -->C
+#define DIRC2 42   
+
+#define PWMD 5     
+#define DIRD1 A4  
+#define DIRD2 A5   
+
+// Macros de controle (Mantidas conforme seu original)
+#define MOTORA_FORWARD(pwm)    do{digitalWrite(DIRA1,LOW); digitalWrite(DIRA2,HIGH);analogWrite(PWMA,pwm);}while(0)
+#define MOTORA_STOP(x)         do{digitalWrite(DIRA1,LOW); digitalWrite(DIRA2,LOW); analogWrite(PWMA,0);}while(0)
+#define MOTORA_BACKOFF(pwm)    do{digitalWrite(DIRA1,HIGH);digitalWrite(DIRA2,LOW); analogWrite(PWMA,pwm);}while(0)
+
+#define MOTORB_FORWARD(pwm)    do{digitalWrite(DIRB1,HIGH); digitalWrite(DIRB2,LOW);analogWrite(PWMB,pwm);}while(0)
+#define MOTORB_STOP(x)         do{digitalWrite(DIRB1,LOW); digitalWrite(DIRB2,LOW); analogWrite(PWMB,0);}while(0)
+#define MOTORB_BACKOFF(pwm)    do{digitalWrite(DIRB1,LOW);digitalWrite(DIRB2,HIGH); analogWrite(PWMB,pwm);}while(0)
+
+#define MOTORC_FORWARD(pwm)    do{digitalWrite(DIRC1,LOW); digitalWrite(DIRC2,HIGH);analogWrite(PWMC,pwm);}while(0)
+#define MOTORC_STOP(x)         do{digitalWrite(DIRC1,LOW); digitalWrite(DIRC2,LOW); analogWrite(PWMC,0);}while(0)
+#define MOTORC_BACKOFF(pwm)    do{digitalWrite(DIRC1,HIGH);digitalWrite(DIRC2,LOW); analogWrite(PWMC,pwm);}while(0)
+
+#define MOTORD_FORWARD(pwm)    do{digitalWrite(DIRD1,HIGH); digitalWrite(DIRD2,LOW);analogWrite(PWMD,pwm);}while(0)
+#define MOTORD_STOP(x)         do{digitalWrite(DIRD1,LOW); digitalWrite(DIRD2,LOW); analogWrite(PWMD,0);}while(0)
+#define MOTORD_BACKOFF(pwm)    do{digitalWrite(DIRD1,LOW);digitalWrite(DIRD2,HIGH); analogWrite(PWMD,pwm);}while(0)
+
+// Velocidade padrão para comandos via ROS
+int Motor_PWM = 90; 
+int Motor_PWM_HIGH = 110;
+
+// Funções de movimento
+void ADVANCE() {
+  MOTORA_FORWARD(Motor_PWM_HIGH); MOTORB_FORWARD(Motor_PWM_HIGH);    
+  MOTORC_FORWARD(Motor_PWM_HIGH); MOTORD_FORWARD(Motor_PWM_HIGH);    
+}
+
+void BACK() {
+  MOTORA_BACKOFF(Motor_PWM); MOTORB_BACKOFF(Motor_PWM);
+  MOTORC_BACKOFF(Motor_PWM); MOTORD_BACKOFF(Motor_PWM);
+}
+
+void RIGHT_2() { // Movimento lateral Esquerda
+  MOTORA_BACKOFF(Motor_PWM); MOTORB_FORWARD(Motor_PWM);
+  MOTORC_FORWARD(Motor_PWM); MOTORD_BACKOFF(Motor_PWM);
+}
+
+void LEFT_2() { // Movimento lateral Direita
+  MOTORA_FORWARD(Motor_PWM); MOTORB_BACKOFF(Motor_PWM);
+  MOTORC_BACKOFF(Motor_PWM); MOTORD_FORWARD(Motor_PWM);
+}
+
+void STOP() {
+  MOTORA_STOP(0); MOTORB_STOP(0);
+  MOTORC_STOP(0); MOTORD_STOP(0);
+}
+
+void IO_init() {
+  pinMode(PWMA, OUTPUT); pinMode(DIRA1, OUTPUT); pinMode(DIRA2, OUTPUT);
+  pinMode(PWMB, OUTPUT); pinMode(DIRB1, OUTPUT); pinMode(DIRB2, OUTPUT);
+  pinMode(PWMC, OUTPUT); pinMode(DIRC1, OUTPUT); pinMode(DIRC2, OUTPUT);
+  pinMode(PWMD, OUTPUT); pinMode(DIRD1, OUTPUT); pinMode(DIRD2, OUTPUT);
+  STOP();
+}
+
+void setup() {
+  // Aumentei a velocidade para 115200, padrão comum em sistemas ROS
+  Serial.begin(115200); 
+  IO_init();
+}
+
+void loop() {
+  // Verifica se há dados chegando da Raspberry Pi
+  if (Serial.available() > 0) {
+    char cmd = Serial.read();
+    processCommand(cmd);
+  }
+}
+
+void processCommand(char command) {
+  switch (command) {
+    case 'w':
+      ADVANCE();
+      break;
+    case 's':
+      BACK();
+      break;
+    case 'a':
+      LEFT_2();
+      break;
+    case 'd':
+      RIGHT_2();
+      break;
+    case 'x': // Comando extra para parada total
+    case ' ': // Espaço também para parar
+      STOP();
+      break;
+    default:
+      // Se receber algo desconhecido, por segurança, para o robô
+      STOP();
+      break;
+  }
+}
