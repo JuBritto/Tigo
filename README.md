@@ -16,5 +16,5 @@ ros2 run mecanum_serial_bridge custom_teleop
 
 ### Comando para rodar o nó de cmd_vel
 source install/setup.bash  
-ros2 run tigo_control cmd_vel_bridge
+ros2 run tigo_control custom_teleop
 
