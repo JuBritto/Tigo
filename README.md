@@ -1,7 +1,9 @@
 # Tigo
 ## Códigos do Tigo
 
-## Comandos do Terminal
+Github para salvar códigos do Tigo
+
+## Comandos do Terminal:
 
 ### Comando para atualizar/compilar no arduino
 nano ~/tigo_arduino/tigo_arduino/tigo_arduino.ino
