@@ -14,7 +14,7 @@ arduino-cli upload -p /dev/ttyUSB0 --fqbn arduino:avr:mega ~/tigo_arduino/tigo_a
 source install/setup.bash
 ros2 run mecanum_serial_bridge custom_teleop
 
-### Comando para rodas o nó de cmd_vel
+### Comando para rodar o nó de cmd_vel
 source install/setup.bash
 ros2 run tigo_control cmd_vel_bridge
 
