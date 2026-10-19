@@ -18,3 +18,6 @@ ros2 run mecanum_serial_bridge custom_teleop
 source install/setup.bash  
 ros2 run tigo_control custom_teleop
 
+### Comando upload arduino notebook
+nano MeuProjeto/MeuProjeto.ino  
+arduino-cli compile --upload -p /dev/ttyUSB0 --fqbn arduino:avr:mega MeuProjeto
