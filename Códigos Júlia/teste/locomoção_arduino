@@ -1,0 +1,173 @@
+// =====================================================
+// ROBÔ TIGO - LOCOMOÇÃO OMNIDIRECIONAL VIA SERIAL
+// Recebe:  V,vx,vy,wz\n   (vx, vy em m/s | wz em rad/s)
+//
+// Cinemática inversa (mecanum):
+//   w_FL = (1/r) * (vx - vy - (lx+ly)*wz)
+//   w_FR = (1/r) * (vx + vy + (lx+ly)*wz)
+//   w_RL = (1/r) * (vx + vy - (lx+ly)*wz)
+//   w_RR = (1/r) * (vx - vy + (lx+ly)*wz)
+// =====================================================
+
+// ---------- Pinagem (lado direito com DIR invertido) ----------
+const uint8_t PWM_FL  = 12;
+const uint8_t DIR1_FL = 34;
+const uint8_t DIR2_FL = 35;
+
+const uint8_t PWM_RL  = 8;
+const uint8_t DIR1_RL = 37;
+const uint8_t DIR2_RL = 36;
+
+const uint8_t PWM_FR  = 6;
+const uint8_t DIR1_FR = 42;
+const uint8_t DIR2_FR = 43;
+
+const uint8_t PWM_RR  = 5;
+const uint8_t DIR1_RR = A5;
+const uint8_t DIR2_RR = A4;
+
+// ---------- Parâmetros do chassi ----------
+const float r  = 0.041;    // raio da roda (m)
+const float lx = 0.082;    // metade da distância entre eixos X (m)
+const float ly = 0.106;    // metade da distância entre eixos Y (m)
+const float K  = lx + ly;
+
+const float W_MAX_RODA = 34.55;  // velocidade angular máxima da roda (rad/s)
+
+// ---------- Estado ----------
+float vx = 0.0, vy = 0.0, wz = 0.0;
+
+unsigned long tempoUltimoComando = 0;
+const unsigned long TIMEOUT_MS = 500;
+
+// ---------- Buffer de recepção serial ----------
+char buffer[48];
+uint8_t idx = 0;
+
+// =====================================================
+// Cinemática inversa
+// =====================================================
+void calcularCinematicaInversa(float v_x, float v_y, float w_z,
+                               float &w_fl, float &w_fr,
+                               float &w_rl, float &w_rr) {
+  w_fl = (v_x - v_y - K * w_z) / r;
+  w_fr = (v_x + v_y + K * w_z) / r;
+  w_rl = (v_x + v_y - K * w_z) / r;
+  w_rr = (v_x - v_y + K * w_z) / r;
+
+  // Se alguma roda passar do limite, reduz todas na mesma proporção
+  // (mantém a direção do movimento)
+  float maior = max(max(fabs(w_fl), fabs(w_fr)), max(fabs(w_rl), fabs(w_rr)));
+  if (maior > W_MAX_RODA) {
+    float fator = W_MAX_RODA / maior;
+    w_fl *= fator;
+    w_fr *= fator;
+    w_rl *= fator;
+    w_rr *= fator;
+  }
+}
+
+// =====================================================
+// Acionamento das pontes H
+// =====================================================
+void acionarMotor(uint8_t pin_pwm, uint8_t pin_dir1, uint8_t pin_dir2, float w_roda) {
+  int pwm_val = (int)(fabs(w_roda) / W_MAX_RODA * 255.0);
+  pwm_val = constrain(pwm_val, 0, 255);
+
+  if (w_roda > 0.01) {            // frente
+    digitalWrite(pin_dir1, LOW);
+    digitalWrite(pin_dir2, HIGH);
+    analogWrite(pin_pwm, pwm_val);
+  } else if (w_roda < -0.01) {    // trás
+    digitalWrite(pin_dir1, HIGH);
+    digitalWrite(pin_dir2, LOW);
+    analogWrite(pin_pwm, pwm_val);
+  } else {                        // parado
+    digitalWrite(pin_dir1, LOW);
+    digitalWrite(pin_dir2, LOW);
+    analogWrite(pin_pwm, 0);
+  }
+}
+
+void aplicarVelocidades(float w_fl, float w_fr, float w_rl, float w_rr) {
+  acionarMotor(PWM_FL, DIR1_FL, DIR2_FL, w_fl);
+  acionarMotor(PWM_FR, DIR1_FR, DIR2_FR, w_fr);
+  acionarMotor(PWM_RL, DIR1_RL, DIR2_RL, w_rl);
+  acionarMotor(PWM_RR, DIR1_RR, DIR2_RR, w_rr);
+}
+
+// =====================================================
+// Interpretação da linha "V,vx,vy,wz"
+// =====================================================
+void processarLinha(char *linha) {
+  if (linha[0] != 'V' || linha[1] != ',') return;
+
+  char *p = linha + 2;
+  char *fim;
+
+  float a = strtod(p, &fim);
+  if (*fim != ',') return;
+  p = fim + 1;
+
+  float b = strtod(p, &fim);
+  if (*fim != ',') return;
+  p = fim + 1;
+
+  float c = strtod(p, &fim);
+
+  vx = a;
+  vy = b;
+  wz = c;
+  tempoUltimoComando = millis();
+}
+
+// Lê a serial sem bloquear
+void lerSerial() {
+  while (Serial.available() > 0) {
+    char c = Serial.read();
+
+    if (c == '\n') {
+      buffer[idx] = '\0';
+      processarLinha(buffer);
+      idx = 0;
+    } else if (c != '\r') {
+      if (idx < sizeof(buffer) - 1) {
+        buffer[idx++] = c;
+      } else {
+        idx = 0;  // linha longa demais: descarta
+      }
+    }
+  }
+}
+
+// =====================================================
+// Setup e loop
+// =====================================================
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(PWM_FL, OUTPUT); pinMode(DIR1_FL, OUTPUT); pinMode(DIR2_FL, OUTPUT);
+  pinMode(PWM_RL, OUTPUT); pinMode(DIR1_RL, OUTPUT); pinMode(DIR2_RL, OUTPUT);
+  pinMode(PWM_FR, OUTPUT); pinMode(DIR1_FR, OUTPUT); pinMode(DIR2_FR, OUTPUT);
+  pinMode(PWM_RR, OUTPUT); pinMode(DIR1_RR, OUTPUT); pinMode(DIR2_RR, OUTPUT);
+
+  aplicarVelocidades(0, 0, 0, 0);
+  tempoUltimoComando = millis();
+}
+
+void loop() {
+  lerSerial();
+
+  // Segurança: sem comando recente, para o robô
+  if (millis() - tempoUltimoComando > TIMEOUT_MS) {
+    vx = 0.0;
+    vy = 0.0;
+    wz = 0.0;
+  }
+
+  float w_fl, w_fr, w_rl, w_rr;
+  calcularCinematicaInversa(vx, vy, wz, w_fl, w_fr, w_rl, w_rr);
+  aplicarVelocidades(w_fl, w_fr, w_rl, w_rr);
+
+  delay(10);
+}
