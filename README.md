@@ -21,3 +21,9 @@ ros2 run tigo_control custom_teleop
 ### Comando upload arduino notebook
 nano MeuProjeto/MeuProjeto.ino  
 arduino-cli compile --upload -p /dev/ttyUSB0 --fqbn arduino:avr:mega MeuProjeto
+
+### Comando github
+git clone git@github.com:lyssa-virus/TIGO.git tigo_ws
+cd tigo_ws
+git checkout -b julia
+git push -u origin julia
